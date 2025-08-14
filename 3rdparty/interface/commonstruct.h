@@ -40,6 +40,7 @@ enum ErrorType {
     ET_UserCancelOpertion,     // 用户取消操作
     ET_ExistVolume,   // 分卷已存在
     ET_FileSeekError,   // 文件不支持seek
+    ET_CompressionMethodNotSupported,   // 压缩方法不支持
 
 };
 

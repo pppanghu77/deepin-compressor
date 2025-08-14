@@ -223,11 +223,22 @@ private Q_SLOTS:
      */
     void slotJobFinished();
 
+    /**
+     * @brief slotJobFinishedWithFallback  带回退机制的job完成处理
+     */
+    void slotJobFinishedWithFallback();
+
 private:
     ArchiveJob *m_pArchiveJob = nullptr;     // 当前操作指针
 
     ReadOnlyArchiveInterface *m_pInterface = nullptr;   // 当前插件指针（只存储load操作的interface，方便解压等操作）
     ReadOnlyArchiveInterface *m_pTempInterface = nullptr;   // 存储job结束即需要删除的interface
+
+    // 回退机制相关成员变量
+    QString m_strFallbackArchivePath;                    // 回退时使用的压缩包路径
+    QList<FileEntry> m_filesFallback;                   // 回退时使用的文件列表
+    ExtractionOptions m_optionsFallback;               // 回退时使用的解压选项
+    UiTools::AssignPluginType m_eTypeFallback;         // 回退时使用的插件类型
 
     static QMutex m_mutex;//实例互斥锁。
     static QAtomicPointer<ArchiveManager> m_instance;   /*!<使用原子指针,默认初始化为0。*/

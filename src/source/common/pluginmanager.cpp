@@ -13,6 +13,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSet>
+#include <QDirIterator>
 #include <QStandardPaths>
 #include <QDebug>
 
@@ -236,8 +237,32 @@ void PluginManager::setFileSize(qint64 size)
 
 void PluginManager::loadPlugins()
 {
+#ifndef CMAKE_BUILD_TYPE_DEBUG
+    // Debug模式：直接从构建目录加载插件
+    QString currentDir = QCoreApplication::applicationDirPath();
+    QString buildPluginDir = currentDir.replace("/src", "/3rdparty");
+    qInfo() << "Debug mode: Loading plugins from" << buildPluginDir;
+
+    QVector<KPluginMetaData> plugins;
+    // 手动扫描构建目录中的所有.so文件
+    QDirIterator it(buildPluginDir, QStringList() << "*.so", QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString pluginPath = it.next();
+        qInfo() << "Found plugin file:" << pluginPath;
+        KPluginMetaData metaData(pluginPath);
+        if (metaData.isValid()) {
+            plugins.append(metaData);
+            qInfo() << "Loaded valid plugin:" << metaData.pluginId() << "from" << pluginPath;
+        } else {
+            qInfo() << "Invalid plugin metadata for:" << pluginPath;
+        }
+    }
+#else
+    // Release模式：从系统安装目录加载插件
     QCoreApplication::addLibraryPath("/usr/lib/");
-    const QVector<KPluginMetaData> plugins = KPluginLoader::findPlugins(QStringLiteral("deepin-compressor/plugins"));
+    plugins = KPluginLoader::findPlugins(QStringLiteral("deepin-compressor/plugins"));
+#endif
+
     QSet<QString> addedPlugins;
     for (const KPluginMetaData &metaData : plugins) {
         const auto pluginId = metaData.pluginId();

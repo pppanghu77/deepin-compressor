@@ -496,8 +496,8 @@ bool Common::findLnfsPath(const QString &target, Compare func)
         QString fsTypeStr = fsType ? QString(fsType) : "";
         QString mountPointStr = unifyPath(mountPoint);
 
-        qInfo() << "Checking filesystem - Type:" << fsTypeStr
-                << "Mount:" << mountPointStr;
+//        qInfo() << "Checking filesystem - Type:" << fsTypeStr
+//                << "Mount:" << mountPointStr;
 
         // 检查是否是支持长文件名的文件系统类型
         bool isLongFileNameFS = (fsTypeStr == "fuse.dlnfs") ||

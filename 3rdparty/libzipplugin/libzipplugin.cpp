@@ -1024,7 +1024,11 @@ ErrorType LibzipPlugin::extractEntry(zip_t *archive, zip_int64_t index, const Ex
                 }
             } else if (ZIP_ER_NOPASSWD == iErr) {   // 无密码输入
                 return ET_NeedPassword;
+            } else if (ZIP_ER_COMPNOTSUPP == iErr) {   // 压缩方法不支持
+                qDebug() << "ZIP compression method not supported by libzip (error 16), will try 7z plugin";
+                return ET_CompressionMethodNotSupported;
             } else {
+                qDebug() << "ZIP file open error, error code:" << iErr;
                 return ET_FileOpenError;
             }
         }

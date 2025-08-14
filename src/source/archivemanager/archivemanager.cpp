@@ -166,11 +166,17 @@ bool ArchiveManager::extractFiles(const QString &strArchiveFullPath, const QList
             ExtractJob *pExtractJob = new ExtractJob(files, m_pInterface, stOptions);
 
             // 连接槽函数
-            connect(pExtractJob, &ExtractJob::signalJobFinshed, this, &ArchiveManager::slotJobFinished);
+            connect(pExtractJob, &ExtractJob::signalJobFinshed, this, &ArchiveManager::slotJobFinishedWithFallback);
             connect(pExtractJob, &ExtractJob::signalprogress, this, &ArchiveManager::signalprogress);
             connect(pExtractJob, &ExtractJob::signalCurFileName, this, &ArchiveManager::signalCurFileName);
             connect(pExtractJob, &ExtractJob::signalFileWriteErrorName, this, &ArchiveManager::signalFileWriteErrorName);
             connect(pExtractJob, &ExtractJob::signalQuery, this, &ArchiveManager::signalQuery);
+
+            // 保存参数以备回退使用
+            m_strFallbackArchivePath = strArchiveFullPath;
+            m_filesFallback = files;
+            m_optionsFallback = stOptions;
+            m_eTypeFallback = eType;
 
             m_pArchiveJob = pExtractJob;
             pExtractJob->start();
@@ -461,6 +467,63 @@ void ArchiveManager::slotJobFinished()
         m_pArchiveJob = nullptr;
 
         // 发送结束信号
+        emit signalJobFinished(eJobType, eFinishType, eErrorType);
+    }
+
+    // 释放临时记录的interface
+    SAFE_DELETE_ELE(m_pTempInterface);
+}
+
+void ArchiveManager::slotJobFinishedWithFallback()
+{
+    if (m_pArchiveJob) {
+        // 获取结束结果
+        ArchiveJob::JobType eJobType = m_pArchiveJob->m_eJobType;
+        PluginFinishType eFinishType = m_pArchiveJob->m_eFinishedType;
+        ErrorType eErrorType = m_pArchiveJob->m_eErrorType;
+
+        // 释放job
+        m_pArchiveJob->deleteLater();
+        m_pArchiveJob = nullptr;
+
+        // 检查是否需要回退到7z插件
+        if (eFinishType == PFT_Error &&
+            eErrorType == ET_CompressionMethodNotSupported &&
+            eJobType == ArchiveJob::JT_Extract &&
+            m_eTypeFallback != UiTools::APT_Cli7z) {
+
+            qInfo() << "Compression method not supported, trying fallback to 7z plugin";
+
+            // 释放当前interface
+            SAFE_DELETE_ELE(m_pInterface);
+
+            // 使用7z插件重新创建interface
+            m_pInterface = UiTools::createInterface(m_strFallbackArchivePath, false, UiTools::APT_Cli7z);
+
+            if (m_pInterface) {
+                qInfo() << "Successfully created 7z interface, retrying extraction";
+
+                // 创建新的ExtractJob使用7z插件
+                ExtractJob *pExtractJob = new ExtractJob(m_filesFallback, m_pInterface, m_optionsFallback);
+
+                // 连接槽函数（使用普通的完成处理，避免无限回退）
+                connect(pExtractJob, &ExtractJob::signalJobFinshed, this, &ArchiveManager::slotJobFinished);
+                connect(pExtractJob, &ExtractJob::signalprogress, this, &ArchiveManager::signalprogress);
+                connect(pExtractJob, &ExtractJob::signalCurFileName, this, &ArchiveManager::signalCurFileName);
+                connect(pExtractJob, &ExtractJob::signalFileWriteErrorName, this, &ArchiveManager::signalFileWriteErrorName);
+                connect(pExtractJob, &ExtractJob::signalQuery, this, &ArchiveManager::signalQuery);
+
+                m_pArchiveJob = pExtractJob;
+                pExtractJob->start();
+
+                return; // 重新开始解压，不发送完成信号
+            } else {
+                qWarning() << "Failed to create 7z interface for fallback";
+                // 如果7z插件也失败了，继续发送原始错误
+            }
+        }
+
+        // 发送结束信号（正常完成或回退失败）
         emit signalJobFinished(eJobType, eFinishType, eErrorType);
     }
 
